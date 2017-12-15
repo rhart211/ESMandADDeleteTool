@@ -10,6 +10,7 @@ import argparse
 import xlsxwriter
 import getpass
 from ldap3 import Server, Connection, SUBTREE, DEREF_ALWAYS
+
 #In a devtest environment, self-signed certs are regularly used.
 #Let's disable the warning when over-riding.
 import urllib3
@@ -20,11 +21,11 @@ def build_url(esm):
     return url_base
 
 def get_AD_password(ad_user):
-    ad_password = getpass.getpass('Enter password for your domain username %s' %user)
+    ad_password = getpass.getpass('Enter password for your domain username %s: ' %ad_user)
     return ad_password
 
 def get_ESM_password(esm_user):
-    esm_password = getpass.getpass('Enter password for your ESM username %s: ' %user)
+    esm_password = getpass.getpass('Enter password for your ESM username %s: ' %esm_user)
     return esm_password
 
 def login(url_base, user, password):
@@ -44,13 +45,14 @@ def login(url_base, user, password):
         sys.exit(1)
     return session_header
 
-def getLdapClientConnection(ad_server, adUser_dn, ad_password):
+def getLdapClientConnection(ad_server, ad_user, ad_password):
     try:
         server = Server(ad_server, port=389, use_ssl=False)
-        connection = Connection(server, auto_bind=True, version=3, authentication="SIMPLE", user=adUser_dn, password=ad_password)
+        connection = Connection(server, auto_bind=True, version=3, authentication="SIMPLE", user=ad_user, password=ad_password)
         return connection
     except:
-        print("Failed to establish LDAP connection.")
+        print "Failed to establish LDAP connection. Could not bind to AD Server: %s with the specified credentials" %ad_server
+        sys.exit(1)
 
 def logout(url_base, session_header):
     requests.delete(url_base + 'logout', headers=session_header, verify=False)
@@ -217,6 +219,7 @@ def createUserWrkbk(user_type, userlist):
             worksheet.write_string(row, col, user, user_fmt)
             row += 1
         workbook.close()
+        print "Created Spreadsheet"
     else:
         if user_type == 'ESM Only':
             print "There are no ESM Only Users"
@@ -266,6 +269,7 @@ def createCombinedWrkbk(esm_users, ad_users, esmonly):
     print "Created Spreadsheet"
 
 def main():
+
     parser = argparse.ArgumentParser(description='McAfee ESM and Active Directory Clean up Tool. The main purpose of this tool is to delete Users that exist in ESM but not in Active Directory. A secondary function exists where an ESM account can be disabled, if it is disabled in Active Directory.')
 
     # AD parameters
@@ -274,8 +278,7 @@ def main():
                           help="Active Directory Server Hostname/ip", required=True)
     ad_group.add_argument("-d", "--ad_user", type=str, metavar='AD USERNAME',
                           help="DOMAIN\\username for authentication", required=True)
-    ad_group.add_argument("-n", "--ad_password", type=str, metavar='AD PASSWORD', help="Domain User Password",
-                          required=True)
+    ad_group.add_argument("-n", "--ad_password", type=str, metavar='AD PASSWORD', help="Domain User Password")
     ad_group.add_argument("-b", "--ad_group", type=str, metavar='AD GROUP BASEDN', help="AD Group Search Base DN, in a format similar to CN=Group,OU=Groups,DC=Example,DC=Com",
                           required=True)
     # ESM Parameters
@@ -283,8 +286,7 @@ def main():
     esm_group.add_argument("-e", "--esm", type=str, metavar='ESM HOSTNAME', help="ESM Hostname/ip", required=True)
     esm_group.add_argument("-u", "--esm_user", type=str, metavar='ESM User', help='ESM Username for authentication',
                            required=True)
-    esm_group.add_argument("-p", '--esm_password', type=str, metavar='ESM Password', help='ESM User Password',
-                           required=True)
+    esm_group.add_argument("-p", '--esm_password', type=str, metavar='ESM Password', help='ESM User Password')
     esm_group.add_argument("-g", "--esm_group", type=str, metavar='ESM GROUP', help="ESM Group Name", required=True)
 
     #Actions
@@ -303,8 +305,8 @@ def main():
 
     args = parser.parse_args()
 
-    if not '\\' in arg.ad_user:
-        print 'Username must include a domain, use: DOMAIN\\username'
+    if not '\\' in args.ad_user:
+        print 'Username must include a domain, use: DOMAIN\username'
         sys.exit(1)
     if args.ad_password is None:
         args.ad_password = get_AD_password(args.ad_user)
@@ -312,10 +314,6 @@ def main():
         args.esm_password = get_ESM_password(args.esm_user)
 
     connection = getLdapClientConnection(args.ad_server, args.ad_user, args.ad_password)
-
-    if not connection.bind():
-        print "Could not bind to AD Server: %s with the specified credentials" %args.ad_server
-        sys.exit(1)
 
     url = build_url(args.esm)
     session = login(url, args.esm_user, args.esm_password)
@@ -331,19 +329,17 @@ def main():
         createUserWrkbk("Deleted ESM", esm_users_notinAD)
 
     if args.disable:
-        disabled_esm_users = []
-        for user in listDisabledUsersinGroup(connection, ad_users):
-            all_esm_users = listESMUsers(esmUsers)
-            if user in all_esm_users:
-                disableEsmUser(url, session, args.esm_password, esmUsers, user)
-                disabled_esm_users.append(user)
+        dupes = set(listESMUsers(esmUsers)).intersection(listDisabledUsersinGroup(connection, ad_users_in_group))
+        disabled_esm_users = list(dupes)
+        for user in disabled_esm_users:
+            disableEsmUser(url, session, args.esm_password, esmUsers, user)
         createUserWrkbk('Disabled ESM', disabled_esm_users)
 
     closeLdapClientConnection(connection)
     logout(url, session)
 
     if args.write_ad_users:
-        createUserWrkbk('Active Direcotry', ad_users)
+        createUserWrkbk('Active Directory', ad_users)
     if args.write_esm_users:
         createUserWrkbk('McAfee ESM', esm_users)
     if args.write_esmonly:
