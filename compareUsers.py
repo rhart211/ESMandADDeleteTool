@@ -98,7 +98,7 @@ def getUserID(esmUsers, user):
     for item in esmUsers.get('return'):
         if user in item.get('username'):
             user_id = item.get('id').get('value')
-    return user_id
+            return user_id
 
 def getUserConfig(esmUsers, user):
     for item in esmUsers.get('return'):
@@ -195,15 +195,25 @@ def esmUsersNotinAD(esm_users, ad_users):
     diff_users = list(set(diffs) - defaultEsm_users)
     return diff_users
 
+def adUsersNotinESM(ad_users, esm_users):
+    dupes = set(ad_users).intersection(esm_users)
+    diffs = set(ad_users) - set(dupes)
+    diff_users = list(diffs)
+    return diff_users
+
 def build_script_constants(conn, ad_group, url_base, session_header, esm_password, esm_group):
     ad_users_in_group = listAllUsersinGroup(conn, ad_group)
     esmUsers = esmUserList(url_base, session_header, esm_password)
     groupID = getGroupID(url_base, session_header, esm_password, esm_group)
     return ad_users_in_group, esmUsers, groupID
 
-def createUserWrkbk(user_type, userlist):
+def createUserWrkbk(file_path, user_type, userlist):
+    if not os.path.exists(file_path):
+        os.makedirs(file_path)
+    if '~' in file_path:
+        file_path = os.path.expanduser(file_path)
     if len(userlist) != 0:
-        workbook = xlsxwriter.Workbook(user_type+'_Users.xlsx')
+        workbook = xlsxwriter.Workbook(file_path + user_type + ' Users.xlsx')
         worksheet = workbook.add_worksheet()
         format = workbook.add_format({'bold': True, 'align' : 'center'})
         format.set_bg_color('#90EE90')
@@ -223,11 +233,17 @@ def createUserWrkbk(user_type, userlist):
     else:
         if user_type == 'ESM Only':
             print "There are no ESM Only Users"
+        elif user_type == 'AD Only':
+            print "There are no AD Only Users"
         else:
             print "User List is empty"
 
-def createCombinedWrkbk(esm_users, ad_users, esmonly):
-    workbook = xlsxwriter.Workbook('All_Users.xlsx')
+def createCombinedWrkbk(file_path, esm_users, ad_users, esmonly, adonly):
+    if not os.path.exists(file_path):
+        os.makedirs(file_path)
+    if '~' in file_path:
+        file_path = os.path.expanduser(file_path)    
+    workbook = xlsxwriter.Workbook(file_path + 'All Users.xlsx')
     worksheet = workbook.add_worksheet()
     format = workbook.add_format({'bold': True, 'align': 'center'})
     format.set_bg_color('#90EE90')
@@ -237,9 +253,11 @@ def createCombinedWrkbk(esm_users, ad_users, esmonly):
     worksheet.write('A1', 'ESM Users', format)
     worksheet.write('B1', 'AD Users', format)
     worksheet.write('C1', 'ESM Only Users', format)
+    workshett.write('D1', 'AD Only Users', format)
     worksheet.set_column(0, 0, 20)
     worksheet.set_column(1, 1, 20)
     worksheet.set_column(2, 2, 20)
+    worksheet.set_column(3, 3, 20)
     worksheet.freeze_panes(1, 0)
     if len(esm_users) != 0:
         row = 1
@@ -265,6 +283,14 @@ def createCombinedWrkbk(esm_users, ad_users, esmonly):
             row += 1
     else:
         print "List of Users in ESM only is empty, and was not written to spreadsheet."
+    if len(adonly) != 0:
+        row = 1
+        col = 3
+        for user in adonly:
+            worksheet.write_string(row, col, user, user_fmt)
+            row += 1
+    else:
+        print "List of Users in AD only is empty, and was not written to spreadsheet."
     workbook.close()
     print "Created Spreadsheet"
 
@@ -301,6 +327,7 @@ def main():
     outputgroup.add_argument("--write_ad_users", action='store_true', help="Create a spreadsheet containing only users in the AD Group")
     outputgroup.add_argument("--write_esm_users", action='store_true', help="Create a spreadsheet containing only users in the ESM Group")
     outputgroup.add_argument("--write_esmonly", action='store_true', help="Create a spreadsheet containing only users that exist in the ESM, but not in AD Group")
+    outputgroup.add_argument("--write_adonly", action='store_true', help="Create a spreadsheet containing only users that exist in AD, but not in the ESM")
     outputgroup.add_argument("--write_all", action='store_true', help='Create a spreadsheet containing AD Users, ESM Users, and ESM Only Users')
 
     args = parser.parse_args()
@@ -321,32 +348,39 @@ def main():
 
     ad_users = getSamAccountNames(connection, ad_users_in_group)
     esm_users = listUsernamesinGroup(esmUsers, groupID)
-    esm_users_notinAD = esmUsersNotinAD(ad_users, esm_users)
+    esm_users_notinAD = esmUsersNotinAD(esm_users, ad_users)
+    ad_users_notinESM = adUsersNotinESM(ad_users, esm_users)
+
+    if args.outdir is not None:
+        file_path = args.outdir
+    else:
+        file_path = './'
 
     if args.delete:
         for user in esm_users_notinAD:
             deleteUser(url, session, args.esm_password, esmUsers, user)
-        createUserWrkbk("Deleted ESM", esm_users_notinAD)
+        createUserWrkbk(file_path, "Deleted ESM", esm_users_notinAD)
 
     if args.disable:
         dupes = set(listESMUsers(esmUsers)).intersection(listDisabledUsersinGroup(connection, ad_users_in_group))
         disabled_esm_users = list(dupes)
         for user in disabled_esm_users:
             disableEsmUser(url, session, args.esm_password, esmUsers, user)
-        createUserWrkbk('Disabled ESM', disabled_esm_users)
+        createUserWrkbk(file_path, 'Disabled ESM', disabled_esm_users)
 
     closeLdapClientConnection(connection)
     logout(url, session)
 
     if args.write_ad_users:
-        createUserWrkbk('Active Directory', ad_users)
+        createUserWrkbk(file_path, 'Active Directory', ad_users)
     if args.write_esm_users:
-        createUserWrkbk('McAfee ESM', esm_users)
+        createUserWrkbk(file_path, 'McAfee ESM', esm_users)
     if args.write_esmonly:
-        createUserWrkbk('ESM Only', esm_users_notinAD)
+        createUserWrkbk(file_path, 'ESM Only', esm_users_notinAD)
+    if args.write_adonly:
+        createUserWrkbk(file_path, 'AD Only', ad_users_notinESM)
     if args.write_all:
-        createCombinedWrkbk(esm_users, ad_users, esm_users_notinAD)
-
+        createCombinedWrkbk(file_path, esm_users, ad_users, esm_users_notinAD, ad_users_notinESM)
 
 if __name__ == "__main__":
     main()
