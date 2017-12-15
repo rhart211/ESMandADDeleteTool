@@ -88,7 +88,7 @@ def listUsernamesinGroup(esmUsers, groupID):
 def listESMUsers(esmUsers):
     results = []
     for item in esmUsers.get('return'):
-        pattern = re.search('[a-zA-Z0-9\x2e]+(.*)', item.get('username')).group(1
+        pattern = re.search('[a-zA-Z0-9\x2e]+(.*)', item.get('username')).group(1)
         results.append(item.get('username').replace(pattern, '').lower())
     return results
 
