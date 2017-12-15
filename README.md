@@ -12,7 +12,8 @@ To use this tool:
   run `python compareUsers.py`
 
 You can also get to help by using -h switch:
-```usage: compareUsers.py [-h] -a AD SERVER -d AD USERNAME [-n AD PASSWORD] -b AD
+```
+usage: compareUsers.py [-h] -a AD SERVER -d AD USERNAME [-n AD PASSWORD] -b AD
                        GROUP BASEDN -e ESM HOSTNAME -u ESM User
                        [-p ESM Password] -g ESM GROUP [-r | -s] [-o DIRECTORY]
                        [--write_ad_users] [--write_esm_users]
