@@ -193,8 +193,6 @@ def esmUsersNotinAD(esm_users, ad_users):
     diff_users = list(set(diffs) - defaultEsm_users)
     return diff_users
 
-def esmUsersinADdisbled(esm_user)
-
 def build_script_constants(conn, ad_group, url_base, session_header, esm_password, esm_group):
     ad_users_in_group = listAllUsersinGroup(conn, ad_group)
     esmUsers = esmUserList(url_base, session_header, esm_password)
