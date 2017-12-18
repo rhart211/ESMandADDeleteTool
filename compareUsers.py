@@ -207,13 +207,14 @@ def build_script_constants(conn, ad_group, url_base, session_header, esm_passwor
     groupID = getGroupID(url_base, session_header, esm_password, esm_group)
     return ad_users_in_group, esmUsers, groupID
 
-def createUserWrkbk(file_path, user_type, userlist):
-    if not os.path.exists(file_path):
-        os.makedirs(file_path)
-    if '~' in file_path:
-        file_path = os.path.expanduser(file_path)
+def createUserWrkbk(base_path, user_type, userlist):
+    if not os.path.exists(base_path):
+        os.makedirs(base_path)
+    if '~' in base_path:
+        base_path = os.path.expanduser(file_path)
+    file_path = os.path.join(base_path, user_type + ' Users.xlsx')
     if len(userlist) != 0:
-        workbook = xlsxwriter.Workbook(file_path + user_type + ' Users.xlsx')
+        workbook = xlsxwriter.Workbook(file_path)
         worksheet = workbook.add_worksheet()
         format = workbook.add_format({'bold': True, 'align' : 'center'})
         format.set_bg_color('#90EE90')
@@ -238,12 +239,13 @@ def createUserWrkbk(file_path, user_type, userlist):
         else:
             print "User List is empty"
 
-def createCombinedWrkbk(file_path, esm_users, ad_users, esmonly, adonly):
-    if not os.path.exists(file_path):
-        os.makedirs(file_path)
-    if '~' in file_path:
-        file_path = os.path.expanduser(file_path)    
-    workbook = xlsxwriter.Workbook(file_path + 'All Users.xlsx')
+def createCombinedWrkbk(base_path, esm_users, ad_users, esmonly, adonly):
+    if not os.path.exists(base_path):
+        os.makedirs(base_path)
+    if '~' in base_path:
+        base_path = os.path.expanduser(file_path)   
+    file_path = os.path.join(base_path, 'All Users.xlsx')
+    workbook = xlsxwriter.Workbook(file_path)
     worksheet = workbook.add_worksheet()
     format = workbook.add_format({'bold': True, 'align': 'center'})
     format.set_bg_color('#90EE90')
@@ -354,7 +356,7 @@ def main():
     if args.outdir is not None:
         file_path = args.outdir
     else:
-        file_path = './'
+        file_path = '.'
 
     if args.delete:
         for user in esm_users_notinAD:
