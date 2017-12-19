@@ -11,8 +11,8 @@ import xlsxwriter
 import getpass
 from ldap3 import Server, Connection, SUBTREE, DEREF_ALWAYS
 
-#In a devtest environment, self-signed certs are regularly used.
-#Let's disable the warning when over-riding.
+# In a devtest environment, self-signed certs are regularly used.
+# Let's disable the warning when over-riding.
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
