@@ -23,45 +23,26 @@ def build_url(esm):
 
 
 def get_AD_password(ad_user):
-    ad_password = getpass.getpass(
-        'Enter password for your domain username %s: ' % ad_user)
+    ad_password = getpass.getpass('Enter password for your domain username %s: ' % ad_user)
     return ad_password
 
 
 def get_ESM_password(esm_user):
-    esm_password = getpass.getpass(
-        'Enter password for your ESM username %s: ' % esm_user)
+    esm_password = getpass.getpass('Enter password for your ESM username %s: ' % esm_user)
     return esm_password
 
 def login(url_base, user, password):
     try:
-        user = base64.b64encode(
-                user)
-        password = base64.b64encode(
-                    password)
-        params = {
-                  "username": user, 
-                  "password": password, 
-                  "locale": "en_US", 
-                  "os" : "Win32"
-                 }
+        user = base64.b64encode(user)
+        password = base64.b64encode(password)
+        params = {"username": user, "password": password, "locale": "en_US", "os" : "Win32"}
         params_json = json.dumps(params)
-        login_headers = {
-                         'Content-Type': 'application/json'
-                        }
-        login_response = requests.post(
-            url_base + 'login', params_json, 
-                headers=login_headers, verify=False)
+        login_headers = {'Content-Type': 'application/json'}
+        login_response = requests.post(url_base + 'login', params_json, headers=login_headers, verify=False)
         Cookie = login_response.headers.get('Set-Cookie')
-        JWTToken = re.search(
-                             '(^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*)',
-                             Cookie).group(1)
+        JWTToken = re.search('(^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*)', Cookie).group(1)
         Xsrf_Token = login_response.headers.get('Xsrf-Token')
-        session_header = {
-                          'Cookie' : JWTToken,
-                          'X-Xsrf-Token' : Xsrf_Token,
-                          'Content-Type': 'application/json'
-                         }
+        session_header = {'Cookie' : JWTToken, 'X-Xsrf-Token' : Xsrf_Token, 'Content-Type': 'application/json'}
     except KeyError:
         print 'Invalid credentials'
         sys.exit(1)
@@ -70,13 +51,10 @@ def login(url_base, user, password):
 def getLdapClientConnection(ad_server, ad_user, ad_password):
     try:
         server = Server(ad_server, port=389, use_ssl=False)
-        connection = Connection(server, auto_bind=True, version=3, 
-                                authentication="SIMPLE", user=ad_user, 
-                                password=ad_password)
+        connection = Connection(server, auto_bind=True, version=3, authentication="SIMPLE", user=ad_user, password=ad_password)
         return connection
     except:
-        print "Failed to establish LDAP connection." 
-        print "Could not bind to AD Server: %s with the specified credentials" % ad_server
+        print "Failed to establish LDAP connection. Could not bind to AD Server: %s with the specified credentials" % ad_server
         sys.exit(1)
 
 def logout(url_base, session_header):
@@ -88,18 +66,14 @@ def closeLdapClientConnection(connection):
 def esmUserList(url_base, session_header, password):
     params = {"authPW": {"value": password}}
     params_json = json.dumps(params)
-    response = requests.post(url_base + 'userGetUserList', data=params_json, 
-                             headers=session_header, verify=False)
+    response = requests.post(url_base + 'userGetUserList', data=params_json, headers=session_header, verify=False)
     data = response.json()
     return data
 
 def getGroupID(url_base, session_header, password, groupname):
     params = {"authPW": {"value": password}}
     params_json = json.dumps(params)
-    response = requests.post(url_base + 
-                             'userGetAccessGroupList?restrictToUsersGroup=false', 
-                             data=params_json, headers = session_header, 
-                             verify = False)
+    response = requests.post(url_base + 'userGetAccessGroupList?restrictToUsersGroup=false', data=params_json, headers = session_header, verify = False)
     data = response.json()
     for item in data.get('return'):
         if groupname == item.get('name'):
