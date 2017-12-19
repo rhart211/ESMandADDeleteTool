@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+# !/usr/bin/env python
 
 import base64
 import requests
@@ -11,35 +11,57 @@ import xlsxwriter
 import getpass
 from ldap3 import Server, Connection, SUBTREE, DEREF_ALWAYS
 
-#In a devtest environment, self-signed certs are regularly used.
-#Let's disable the warning when over-riding.
+# In a devtest environment, self-signed certs are regularly used.
+# Let's disable the warning when over-riding.
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 def build_url(esm):
     url_base = 'https://' + esm + '/rs/esm/'
     return url_base
 
+
 def get_AD_password(ad_user):
-    ad_password = getpass.getpass('Enter password for your domain username %s: ' %ad_user)
+    ad_password = getpass.getpass(
+        'Enter password for your domain username %s: ' % ad_user)
     return ad_password
 
+
 def get_ESM_password(esm_user):
-    esm_password = getpass.getpass('Enter password for your ESM username %s: ' %esm_user)
+    esm_password = getpass.getpass(
+        'Enter password for your ESM username %s: ' % esm_user)
     return esm_password
 
 def login(url_base, user, password):
     try:
-        user = base64.b64encode(user)
-        password = base64.b64encode(password)
-        params = {"username": user, "password": password, "locale": "en_US", "os" : "Win32"}
+        user = base64.b64encode(
+                user)
+        password = base64.b64encode(
+                    password)
+        params = {
+                  "username": user, 
+                  "password": password, 
+                  "locale": "en_US", 
+                  "os" : "Win32"
+                 }
         params_json = json.dumps(params)
-        login_headers = {'Content-Type': 'application/json'}
-        login_response = requests.post(url_base + 'login', params_json, headers=login_headers, verify=False)
+        login_headers = {
+                         'Content-Type': 'application/json'
+                        }
+        login_response = requests.post(
+            url_base + 'login', params_json, 
+                headers=login_headers, verify=False)
         Cookie = login_response.headers.get('Set-Cookie')
-        JWTToken = re.search('(^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*)', Cookie).group(1)
+        JWTToken = re.search(
+                             '(^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*)',
+                             Cookie).group(1)
         Xsrf_Token = login_response.headers.get('Xsrf-Token')
-        session_header = {'Cookie' : JWTToken, 'X-Xsrf-Token' : Xsrf_Token, 'Content-Type': 'application/json'}
+        session_header = {
+                          'Cookie' : JWTToken,
+                          'X-Xsrf-Token' : Xsrf_Token,
+                          'Content-Type': 'application/json'
+                         }
     except KeyError:
         print 'Invalid credentials'
         sys.exit(1)
@@ -48,10 +70,13 @@ def login(url_base, user, password):
 def getLdapClientConnection(ad_server, ad_user, ad_password):
     try:
         server = Server(ad_server, port=389, use_ssl=False)
-        connection = Connection(server, auto_bind=True, version=3, authentication="SIMPLE", user=ad_user, password=ad_password)
+        connection = Connection(server, auto_bind=True, version=3, 
+                                authentication="SIMPLE", user=ad_user, 
+                                password=ad_password)
         return connection
     except:
-        print "Failed to establish LDAP connection. Could not bind to AD Server: %s with the specified credentials" %ad_server
+        print "Failed to establish LDAP connection." 
+        print "Could not bind to AD Server: %s with the specified credentials" % ad_server
         sys.exit(1)
 
 def logout(url_base, session_header):
@@ -63,14 +88,18 @@ def closeLdapClientConnection(connection):
 def esmUserList(url_base, session_header, password):
     params = {"authPW": {"value": password}}
     params_json = json.dumps(params)
-    response = requests.post(url_base + 'userGetUserList', data=params_json, headers=session_header, verify=False)
+    response = requests.post(url_base + 'userGetUserList', data=params_json, 
+                             headers=session_header, verify=False)
     data = response.json()
     return data
 
 def getGroupID(url_base, session_header, password, groupname):
     params = {"authPW": {"value": password}}
     params_json = json.dumps(params)
-    response = requests.post(url_base + 'userGetAccessGroupList?restrictToUsersGroup=false', data=params_json, headers = session_header, verify = False)
+    response = requests.post(url_base + 
+                             'userGetAccessGroupList?restrictToUsersGroup=false', 
+                             data=params_json, headers = session_header, 
+                             verify = False)
     data = response.json()
     for item in data.get('return'):
         if groupname == item.get('name'):
@@ -162,16 +191,16 @@ def getSamAccountNames(connection, ad_users):
     return results
 
 def listDisabledUsersinGroup(connection, ad_users):
-    # User account Control Values for any type of Disabled aD User
-    # -------------------------------------------------------------
-    # Disabled account, 514
-    # Disabled, Password Not Required, 546
-    # Disabled, Password Doesnt Expire, 66050
-    # Disabled, Password Doesnt Expire & Not Required, 66082
-    # Disabled, Smartcard Required, 262658
-    # Disabled, Smartcard Required, Password Not Required, 262690
-    # Disabled, Smartcard Required, Password Doesnt Expire, 328194
-    # Disabled, Smartcard Required, Password Doesnt Expire & Not Required, 328226
+    #  User account Control Values for any type of Disabled aD User
+    #  -------------------------------------------------------------
+    #  Disabled account, 514
+    #  Disabled, Password Not Required, 546
+    #  Disabled, Password Doesnt Expire, 66050
+    #  Disabled, Password Doesnt Expire & Not Required, 66082
+    #  Disabled, Smartcard Required, 262658
+    #  Disabled, Smartcard Required, Password Not Required, 262690
+    #  Disabled, Smartcard Required, Password Doesnt Expire, 328194
+    #  Disabled, Smartcard Required, Password Doesnt Expire & Not Required, 328226
 
     uac_disabled_codes = [514, 546, 66050, 66082, 262658, 262690, 328194, 328226]
     results = []
@@ -217,7 +246,7 @@ def createUserWrkbk(base_path, user_type, userlist):
         workbook = xlsxwriter.Workbook(file_path)
         worksheet = workbook.add_worksheet()
         format = workbook.add_format({'bold': True, 'align' : 'center'})
-        format.set_bg_color('#90EE90')
+        format.set_bg_color('# 90EE90')
         format.set_border(1)
         user_fmt = workbook.add_format({'align' : 'left', 'border' : 1})
         user_fmt.set_text_wrap()
@@ -248,7 +277,7 @@ def createCombinedWrkbk(base_path, esm_users, ad_users, esmonly, adonly):
     workbook = xlsxwriter.Workbook(file_path)
     worksheet = workbook.add_worksheet()
     format = workbook.add_format({'bold': True, 'align': 'center'})
-    format.set_bg_color('#90EE90')
+    format.set_bg_color('# 90EE90')
     format.set_border(1)
     user_fmt = workbook.add_format({'align': 'left', 'border': 1})
     user_fmt.set_text_wrap()
@@ -300,7 +329,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='McAfee ESM and Active Directory Clean up Tool. The main purpose of this tool is to delete Users that exist in ESM but not in Active Directory. A secondary function exists where an ESM account can be disabled, if it is disabled in Active Directory.')
 
-    # AD parameters
+    #  AD parameters
     ad_group = parser.add_argument_group("AD options")
     ad_group.add_argument("-a", "--ad_server", type=str, metavar='AD SERVER',
                           help="Active Directory Server Hostname/ip", required=True)
@@ -309,7 +338,7 @@ def main():
     ad_group.add_argument("-n", "--ad_password", type=str, metavar='AD PASSWORD', help="Domain User Password")
     ad_group.add_argument("-b", "--ad_group", type=str, metavar='AD GROUP BASEDN', help="AD Group Search Base DN, in a format similar to CN=Group,OU=Groups,DC=Example,DC=Com",
                           required=True)
-    # ESM Parameters
+    #  ESM Parameters
     esm_group = parser.add_argument_group("SIEM Options")
     esm_group.add_argument("-e", "--esm", type=str, metavar='ESM HOSTNAME', help="ESM Hostname/ip", required=True)
     esm_group.add_argument("-u", "--esm_user", type=str, metavar='ESM User', help='ESM Username for authentication',
@@ -317,12 +346,12 @@ def main():
     esm_group.add_argument("-p", '--esm_password', type=str, metavar='ESM Password', help='ESM User Password')
     esm_group.add_argument("-g", "--esm_group", type=str, metavar='ESM GROUP', help="ESM Group Name", required=True)
 
-    #Actions
+    # Actions
     action_group = parser.add_mutually_exclusive_group()
     action_group.add_argument("-r", "--delete", action='store_true', help="Delete Users that exist in ESM but not in Active Directory")
     action_group.add_argument("-s", "--disable", action='store_true', help="Disable ESM Accounts that are disabled in Active Directory")
 
-    # Output parameters
+    #  Output parameters
     outputgroup = parser.add_argument_group("Output options")
     outputgroup.add_argument("-o", "--outdir", type=str, metavar='DIRECTORY',
                              help="Directory in which the dump will be saved (default: current)")
