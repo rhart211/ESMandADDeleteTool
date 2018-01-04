@@ -76,6 +76,17 @@ def getGroupID(url_base, session_header, password, groupname):
             groupID = item.get('id').get('value')
             return groupID
 
+# Return of list of the User Names of the ESM Users in the Specified Group
+def listUsernamesinGroup(esmUsers, groupID):
+    results = []
+    data = esmUsers
+    for item in data.get('return'):
+        for group in item.get('groups'):
+            if group.get('value') == groupID:
+                pattern = re.search('[a-zA-Z0-9\x2e]+(.*)', item.get('username')).group(1)
+                results.append(item.get('username').replace(pattern, '').lower())
+    return results
+
 # Delete the Specified ESM User
 def deleteUser(url_base, session_header, password, esmUsers, user):
     userID = getUserID(esmUsers, user)
@@ -179,16 +190,6 @@ def listDisabledUsersinGroup(connection, ad_users):
         for entry in connection.entries:
             if entry.userAccountControl[0] in uac_disabled_codes:
                 results.append(entry.sAMAccountName[0].lower())
-    return results
-
-def listUsernamesinGroup(esmUsers, groupID):
-    results = []
-    data = esmUsers
-    for item in data.get('return'):
-        for group in item.get('groups'):
-            if group.get('value') == groupID:
-                pattern = re.search('[a-zA-Z0-9\x2e]+(.*)', item.get('username')).group(1)
-                results.append(item.get('username').replace(pattern, '').lower())
     return results
 
 
