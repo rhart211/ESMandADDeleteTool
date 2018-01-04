@@ -291,7 +291,7 @@ def createCombinedWrkbk(base_path, esm_users, ad_users, esmonly, adonly):
     worksheet.write('A1', 'ESM Users', format)
     worksheet.write('B1', 'AD Users', format)
     worksheet.write('C1', 'ESM Only Users', format)
-    workshett.write('D1', 'AD Only Users', format)
+    worksheet.write('D1', 'AD Only Users', format)
     worksheet.set_column(0, 0, 20)
     worksheet.set_column(1, 1, 20)
     worksheet.set_column(2, 2, 20)
