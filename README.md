@@ -5,7 +5,7 @@ McAfee ESM and Active Directory CleanUp tool
 The main purpose of this tool is to delete Users that exist in ESM but not in Active Directory. A secondary function exists where an ESM account can be disabled, if it is disabled in Active Directory.
 
 ## Dependencies
-Requires [ldap3](https://github.com/cannatag/ldap3) and [requests](https://github.com/requests/requests)
+Requires [ldap3](https://github.com/cannatag/ldap3), [requests](https://github.com/requests/requests) and [xlsxwriter](https://github.com/jmcnamara/XlsxWriter)
 
 ## Usage
 To use this tool:
