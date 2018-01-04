@@ -27,6 +27,7 @@ def get_ESM_password(esm_user):
     esm_password = getpass.getpass('Enter password for your ESM username %s: ' % esm_user)
     return esm_password
 
+
 ### ESM API Call Functions ###
 
 # Builds the ESM API URL used in all API Call Functions
@@ -104,6 +105,7 @@ def disableEsmUser(url_base, session_header, password, esmUsers, user):
         print 'ESM Account (%s) was successfully disabled' %user
     else:
         print 'This did not work for ESM account (%s)' %user
+
 
 ### LDAP functions ###
 
@@ -189,6 +191,7 @@ def listUsernamesinGroup(esmUsers, groupID):
                 results.append(item.get('username').replace(pattern, '').lower())
     return results
 
+
 ### Helper functions ###
 
 # Returns a list of only the usernames of the ESM Users
@@ -234,6 +237,7 @@ def build_script_constants(conn, ad_group, url_base, session_header, esm_passwor
     groupID = getGroupID(url_base, session_header, esm_password, esm_group)
     return ad_users_in_group, esmUsers, groupID
 
+
 ### Workbook Functions ###
 
 # Create Excel Worksheet containing the Specified User List
@@ -270,7 +274,7 @@ def createUserWrkbk(base_path, user_type, userlist):
             print "User List is empty"
 
 # Create an Excel Worksheet containing All users:
-#               All ESM Users, AD Users, Users that only exist in the ESM Group, and Users that only exist in the AD Group
+#   All ESM Users, AD Users, Users that only exist in the ESM Group, and Users that only exist in the AD Group
 def createCombinedWrkbk(base_path, esm_users, ad_users, esmonly, adonly):
     if not os.path.exists(base_path):
         os.makedirs(base_path)
