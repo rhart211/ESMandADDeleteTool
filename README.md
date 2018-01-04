@@ -55,5 +55,6 @@ Output options:
   --write_ad_users      Create a spreadsheet containing only users in the AD Group
   --write_esm_users     Create a spreadsheet containing only users in the ESM Group
   --write_esmonly       Create a spreadsheet containing only users that exist in the ESM, but not in AD Group
+  --write_adonly        Create a spreadsheet containing only users that exist in AD, but not in the ESM
   --write_all           Create a spreadsheet containing AD Users, ESM Users, and ESM Only Users
   ```
