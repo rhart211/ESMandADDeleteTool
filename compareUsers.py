@@ -17,20 +17,24 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-def build_url(esm):
-    url_base = 'https://' + esm + '/rs/esm/'
-    return url_base
-
-
+# Ask the User for his/her AD/LDAP user password
 def get_AD_password(ad_user):
     ad_password = getpass.getpass('Enter password for your domain username %s: ' % ad_user)
     return ad_password
 
-
+# Ask the User for his/her ESM user password
 def get_ESM_password(esm_user):
     esm_password = getpass.getpass('Enter password for your ESM username %s: ' % esm_user)
     return esm_password
 
+### ESM API Call Functions ###
+
+# Builds the ESM API URL used in all API Call Functions
+def build_url(esm):
+    url_base = 'https://' + esm + '/rs/esm/'
+    return url_base
+
+#ESM Login
 def login(url_base, user, password):
     try:
         user = base64.b64encode(user)
@@ -48,21 +52,11 @@ def login(url_base, user, password):
         sys.exit(1)
     return session_header
 
-def getLdapClientConnection(ad_server, ad_user, ad_password):
-    try:
-        server = Server(ad_server, port=389, use_ssl=False)
-        connection = Connection(server, auto_bind=True, version=3, authentication="SIMPLE", user=ad_user, password=ad_password)
-        return connection
-    except:
-        print "Failed to establish LDAP connection. Could not bind to AD Server: %s with the specified credentials" % ad_server
-        sys.exit(1)
-
+#ESM Logout
 def logout(url_base, session_header):
     requests.delete(url_base + 'logout', headers=session_header, verify=False)
 
-def closeLdapClientConnection(connection):
-    connection.unbind()
-
+# Get a list of all ESM Users
 def esmUserList(url_base, session_header, password):
     params = {"authPW": {"value": password}}
     params_json = json.dumps(params)
@@ -70,6 +64,7 @@ def esmUserList(url_base, session_header, password):
     data = response.json()
     return data
 
+# Get a list of all ESM Groups, and return the ID of the specified Group
 def getGroupID(url_base, session_header, password, groupname):
     params = {"authPW": {"value": password}}
     params_json = json.dumps(params)
@@ -80,34 +75,7 @@ def getGroupID(url_base, session_header, password, groupname):
             groupID = item.get('id').get('value')
             return groupID
 
-def listUsernamesinGroup(esmUsers, groupID):
-    results = []
-    data = esmUsers
-    for item in data.get('return'):
-        for group in item.get('groups'):
-            if group.get('value') == groupID:
-                pattern = re.search('[a-zA-Z0-9\x2e]+(.*)', item.get('username')).group(1)
-                results.append(item.get('username').replace(pattern, '').lower())
-    return results
-
-def listESMUsers(esmUsers):
-    results = []
-    for item in esmUsers.get('return'):
-        pattern = re.search('[a-zA-Z0-9\x2e]+(.*)', item.get('username')).group(1)
-        results.append(item.get('username').replace(pattern, '').lower())
-    return results
-
-def getUserID(esmUsers, user):
-    for item in esmUsers.get('return'):
-        if user in item.get('username'):
-            user_id = item.get('id').get('value')
-            return user_id
-
-def getUserConfig(esmUsers, user):
-    for item in esmUsers.get('return'):
-        if user in item.get('username'):
-            return item
-
+# Delete the Specified ESM User
 def deleteUser(url_base, session_header, password, esmUsers, user):
     userID = getUserID(esmUsers, user)
     params = {
@@ -121,6 +89,7 @@ def deleteUser(url_base, session_header, password, esmUsers, user):
     else:
         print 'This did not work for user (%s)' %user
 
+# Disable the Specified ESM User
 def disableEsmUser(url_base, session_header, password, esmUsers, user):
     params = {}
     user_params = getUserConfig(esmUsers, user)
@@ -136,6 +105,23 @@ def disableEsmUser(url_base, session_header, password, esmUsers, user):
     else:
         print 'This did not work for ESM account (%s)' %user
 
+### LDAP functions ###
+
+# Bind/Connect to LDAP Server
+def getLdapClientConnection(ad_server, ad_user, ad_password):
+    try:
+        server = Server(ad_server, port=389, use_ssl=False)
+        connection = Connection(server, auto_bind=True, version=3, authentication="SIMPLE", user=ad_user, password=ad_password)
+        return connection
+    except:
+        print "Failed to establish LDAP connection. Could not bind to AD Server: %s with the specified credentials" % ad_server
+        sys.exit(1)
+
+# UnBind/Disconnect from LDAP Server
+def closeLdapClientConnection(connection):
+    connection.unbind()
+
+# List all of the users in the specified LDAP Group
 def listAllUsersinGroup(connection, search_basedn):
     results = []
     search_base = search_basedn
@@ -150,6 +136,7 @@ def listAllUsersinGroup(connection, search_basedn):
          results.append(member)
     return results
 
+# Return a list of sAMAccountNames of all users in the Specified LDAP Group
 def getSamAccountNames(connection, ad_users):
     results = []
     for user in ad_users:
@@ -164,6 +151,7 @@ def getSamAccountNames(connection, ad_users):
             results.append(entry.sAMAccountName[0].lower())
     return results
 
+# Return a list of all disabled Users in the Specified LDAP Group
 def listDisabledUsersinGroup(connection, ad_users):
     #  User account Control Values for any type of Disabled aD User
     #  -------------------------------------------------------------
@@ -191,6 +179,40 @@ def listDisabledUsersinGroup(connection, ad_users):
                 results.append(entry.sAMAccountName[0].lower())
     return results
 
+def listUsernamesinGroup(esmUsers, groupID):
+    results = []
+    data = esmUsers
+    for item in data.get('return'):
+        for group in item.get('groups'):
+            if group.get('value') == groupID:
+                pattern = re.search('[a-zA-Z0-9\x2e]+(.*)', item.get('username')).group(1)
+                results.append(item.get('username').replace(pattern, '').lower())
+    return results
+
+### Helper functions ###
+
+# Returns a list of only the usernames of the ESM Users
+def listESMUsers(esmUsers):
+    results = []
+    for item in esmUsers.get('return'):
+        pattern = re.search('[a-zA-Z0-9\x2e]+(.*)', item.get('username')).group(1)
+        results.append(item.get('username').replace(pattern, '').lower())
+    return results
+
+# Returns the ID of the Specified ESM User
+def getUserID(esmUsers, user):
+    for item in esmUsers.get('return'):
+        if user in item.get('username'):
+            user_id = item.get('id').get('value')
+            return user_id
+
+# Returns the configuration of the Specified ESM User
+def getUserConfig(esmUsers, user):
+    for item in esmUsers.get('return'):
+        if user in item.get('username'):
+            return item
+
+# Returns a list of only users that exist in the ESM
 def esmUsersNotinAD(esm_users, ad_users):
     defaultEsm_users = set(['ngcp', 'policy', 'report'])
     dupes = set(esm_users).intersection(ad_users)
@@ -198,18 +220,23 @@ def esmUsersNotinAD(esm_users, ad_users):
     diff_users = list(set(diffs) - defaultEsm_users)
     return diff_users
 
+# Returns a list of only users that exist in Active Directory
 def adUsersNotinESM(ad_users, esm_users):
     dupes = set(ad_users).intersection(esm_users)
     diffs = set(ad_users) - set(dupes)
     diff_users = list(diffs)
     return diff_users
 
+# Generates the list of AD/LDAP Users, ESM Users, and ESM Group ID for the Specified Group
 def build_script_constants(conn, ad_group, url_base, session_header, esm_password, esm_group):
     ad_users_in_group = listAllUsersinGroup(conn, ad_group)
     esmUsers = esmUserList(url_base, session_header, esm_password)
     groupID = getGroupID(url_base, session_header, esm_password, esm_group)
     return ad_users_in_group, esmUsers, groupID
 
+### Workbook Functions ###
+
+# Create Excel Worksheet containing the Specified User List
 def createUserWrkbk(base_path, user_type, userlist):
     if not os.path.exists(base_path):
         os.makedirs(base_path)
@@ -242,11 +269,13 @@ def createUserWrkbk(base_path, user_type, userlist):
         else:
             print "User List is empty"
 
+# Create an Excel Worksheet containing All users:
+#               All ESM Users, AD Users, Users that only exist in the ESM Group, and Users that only exist in the AD Group
 def createCombinedWrkbk(base_path, esm_users, ad_users, esmonly, adonly):
     if not os.path.exists(base_path):
         os.makedirs(base_path)
     if '~' in base_path:
-        base_path = os.path.expanduser(file_path)   
+        base_path = os.path.expanduser(file_path)
     file_path = os.path.join(base_path, 'All Users.xlsx')
     workbook = xlsxwriter.Workbook(file_path)
     worksheet = workbook.add_worksheet()
@@ -299,6 +328,7 @@ def createCombinedWrkbk(base_path, esm_users, ad_users, esmonly, adonly):
     workbook.close()
     print "Created Spreadsheet"
 
+# Main Function :D
 def main():
 
     parser = argparse.ArgumentParser(description='McAfee ESM and Active Directory Clean up Tool. The main purpose of this tool is to delete Users that exist in ESM but not in Active Directory. A secondary function exists where an ESM account can be disabled, if it is disabled in Active Directory.')
@@ -337,6 +367,7 @@ def main():
 
     args = parser.parse_args()
 
+    #Prompt for passwords, if not set
     if not '\\' in args.ad_user:
         print 'Username must include a domain, use: DOMAIN\username'
         sys.exit(1)
@@ -345,27 +376,36 @@ def main():
     if args.esm_password is None:
         args.esm_password = get_ESM_password(args.esm_user)
 
+    # Connect to LDAP Server
     connection = getLdapClientConnection(args.ad_server, args.ad_user, args.ad_password)
 
     url = build_url(args.esm)
+
+    # Login and Grap ESM Session
     session = login(url, args.esm_user, args.esm_password)
+
+    # Grab the AD/LDAP, ESM Users, ESM Group ID of the Specified Group
     ad_users_in_group, esmUsers, groupID = build_script_constants(connection, args.ad_group, url, session, args.esm_password, args.esm_group)
 
+    # Build the Lists needed for the Delete, Disable Functions, and Excel Spreadsheets
     ad_users = getSamAccountNames(connection, ad_users_in_group)
     esm_users = listUsernamesinGroup(esmUsers, groupID)
     esm_users_notinAD = esmUsersNotinAD(esm_users, ad_users)
     ad_users_notinESM = adUsersNotinESM(ad_users, esm_users)
 
+    # Export Worksheets to specified Directory, or current if not set
     if args.outdir is not None:
         file_path = args.outdir
     else:
         file_path = '.'
 
+    # Delete only those Users that exist in the ESM
     if args.delete:
         for user in esm_users_notinAD:
             deleteUser(url, session, args.esm_password, esmUsers, user)
         createUserWrkbk(file_path, "Deleted ESM", esm_users_notinAD)
 
+    # Disable ESM Users that are also Disabled in AD/LDAP
     if args.disable:
         dupes = set(listESMUsers(esmUsers)).intersection(listDisabledUsersinGroup(connection, ad_users_in_group))
         disabled_esm_users = list(dupes)
@@ -373,17 +413,27 @@ def main():
             disableEsmUser(url, session, args.esm_password, esmUsers, user)
         createUserWrkbk(file_path, 'Disabled ESM', disabled_esm_users)
 
+    # Disconnect from LDAP Server
     closeLdapClientConnection(connection)
+
+    # Disconnect from ESM
     logout(url, session)
 
+    # Create Excel Spreadsheet containing all AD/LDAP users from Specified Group
     if args.write_ad_users:
         createUserWrkbk(file_path, 'Active Directory', ad_users)
+
+    # Create Excel Spreadsheet containing all ESM users from Specified Group
     if args.write_esm_users:
         createUserWrkbk(file_path, 'McAfee ESM', esm_users)
+
+    # Create Excel Spreadsheet containing aonly those Users that exist in the ESM Group
     if args.write_esmonly:
         createUserWrkbk(file_path, 'ESM Only', esm_users_notinAD)
+    # Create Excel Spreadsheet containing only those Users that exist in the AD/LDAP Group
     if args.write_adonly:
         createUserWrkbk(file_path, 'AD Only', ad_users_notinESM)
+    # Create Excel Spreadsheet containing all User Lists
     if args.write_all:
         createCombinedWrkbk(file_path, esm_users, ad_users, esm_users_notinAD, ad_users_notinESM)
 
